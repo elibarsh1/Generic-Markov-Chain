@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "markov_chain.h"
+#include <stdbool.h>
 
 #define MAX_LINE_LENGTH 1000
 #define MAX_TWEET_LENGTH 20
@@ -11,6 +12,74 @@
 #define NUM_ARGS_ERROR "Usage: invalid number of arguments"
 
 #define DELIMITERS " \n\t\r"
+
+/**
+ * Print function for strings
+ * @param data pointer to string data
+ */
+void print_string(void *data) {
+    if (data != NULL) {
+        printf("%s", (char*)data);
+    }
+}
+
+/**
+ * Comparison function for strings
+ * @param first_data pointer to first string
+ * @param second_data pointer to second string
+ * @return comparison result like strcmp
+ */
+int comp_strings(void *first_data, void *second_data) {
+    if (first_data == NULL || second_data == NULL) {
+        return 0; // Consider NULL values as equal
+    }
+    return strcmp((char*)first_data, (char*)second_data);
+}
+
+/**
+ * Free function for strings
+ * @param data pointer to string data to free
+ */
+void free_string(void *data) {
+    if (data != NULL) {
+        free(data);
+    }
+}
+
+/**
+ * Copy function for strings
+ * @param data pointer to string data to copy
+ * @return pointer to newly allocated copy
+ */
+void* copy_string(void *data) {
+    if (data == NULL) {
+        return NULL;
+    }
+
+    char *str = (char*)data;
+    char *copy = malloc(strlen(str) + 1);
+    if (copy == NULL) {
+        return NULL;
+    }
+
+    strcpy(copy, str);
+    return copy;
+}
+
+/**
+ * Check if string should be last in sequence (ends with period)
+ * @param data pointer to string data
+ * @return true if string ends with period, false otherwise
+ */
+bool is_last_string(void *data) {
+    if (data == NULL) {
+        return false;
+    }
+
+    char *str = (char*)data;
+    int length = strlen(str);
+    return (length > 0 && str[length - 1] == '.');
+}
 
 int get_random_number(int max_number);
 
@@ -101,18 +170,18 @@ MarkovNode* get_first_random_node(MarkovChain *markov_chain) {
 
         // Get the MarkovNode from the current node
         if (current != NULL) {
-            random_node = (MarkovNode*)current->data;
+            MarkovNode *markov_node = (MarkovNode *)current->data;
+            // Check if this node should be last in sequence
+            if (markov_node != NULL && markov_node->data != NULL) {
+                if (!markov_chain->is_last(markov_node->data)) {
+                    return markov_node;
+                }
+            }
         } else {
             // This should never happen if the database is properly set up
             return NULL;
         }
 
-        // Check if the node's data ends with a period (sentence-ending word)
-        int length = strlen(random_node->data);
-        if (length > 0 && random_node->data[length - 1] != '.') {
-            // Found a suitable node (not a sentence-ending word)
-            return random_node;
-        }
 
         // If we're here, the selected node was a sentence-ending word
         // We'll try again with a new random index
@@ -164,40 +233,37 @@ MarkovNode* get_next_random_node(MarkovNode *cur_markov_node) {
  * Generates a tweet starting from the given first_node
  * Continues to select random next words based on the Markov chain probabilities
  * until reaching a sentence-ending word or max_length
+ * @param markov_chain The markov chain
  * @param first_node The first word in the tweet
  * @param max_length Maximum number of words to include in the tweet
  */
-void generate_tweet(MarkovNode *first_node, int max_length) {
-    if (first_node == NULL || max_length <= 0) {
+void generate_random_sequence(MarkovChain *markov_chain, MarkovNode *first_node, int max_length) {
+    if (markov_chain == NULL || first_node == NULL || max_length <= 0) {
         return;
     }
 
     MarkovNode *current_node = first_node;
     int word_count = 0;
 
-    // Print the first word without a leading space
-    printf("%s", current_node->data);
-    word_count++;
-
-    // Continue generating words until we reach max_length or a sentence-ending word
+    // Generate and print the sequence
     while (word_count < max_length) {
-        // Check if the current word ends with a period (end of sentence)
-        int length = strlen(current_node->data);
-        if (length > 0 && current_node->data[length - 1] == '.') {
-            break; // End tweet generation when we reach a sentence-ending word
-        }
+        // Print the current node's data
+        markov_chain->print_func(current_node->data);
+        word_count++;
 
-        // Get the next random node
-        current_node = get_next_random_node(current_node);
-
-        // If there's no valid next node, end the tweet
-        if (current_node == NULL) {
+        // Check if this should be the last node in the sequence
+        if (markov_chain->is_last(current_node->data)) {
             break;
         }
 
-        // Print the next word with a leading space
-        printf(" %s", current_node->data);
-        word_count++;
+        // Get the next node
+        current_node = get_next_random_node(current_node);
+        if (current_node == NULL) {
+            break; // No next node available
+        }
+
+        // Print a space separator before the next word
+        printf(" ");
     }
 }
 
@@ -275,6 +341,13 @@ int main(int argc, char *argv[]) {
     markov_chain->database->last = NULL;
     markov_chain->database->size = 0;
 
+    // Set up the function pointers for string operations
+    markov_chain->print_func = print_string;
+    markov_chain->comp_func = comp_strings;
+    markov_chain->free_data = free_string;
+    markov_chain->copy_func = copy_string;
+    markov_chain->is_last = is_last_string;
+
     // Fill the markov chain from the file
     if (fill_database(fp, words_to_read, markov_chain) != 0) {
         // Memory allocation error occurred
@@ -300,8 +373,8 @@ int main(int argc, char *argv[]) {
             return EXIT_FAILURE;
         }
 
-        // Generate and print the tweet
-        generate_tweet(first_node, MAX_TWEET_LENGTH);
+        // Get a random first node to start the tweet and generate the sequence
+        generate_random_sequence(markov_chain, first_node, MAX_TWEET_LENGTH);
 
         // Add a newline after each tweet
         printf("\n");

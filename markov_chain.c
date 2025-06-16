@@ -12,7 +12,7 @@ int get_random_number(int max_number)
     return rand() % max_number;
 }
 
-Node* get_node_from_database(MarkovChain *markov_chain, char *data_ptr) {
+Node* get_node_from_database(MarkovChain *markov_chain, void *data_ptr) {
     // Check for NULL inputs
     if (markov_chain == NULL || data_ptr == NULL || markov_chain->database == NULL) {
         return NULL;
@@ -28,7 +28,7 @@ Node* get_node_from_database(MarkovChain *markov_chain, char *data_ptr) {
 
         // Compare the strings to check if this is the node we're looking for
         if (current_markov_node != NULL && current_markov_node->data != NULL) {
-            if (strcmp(current_markov_node->data, data_ptr) == 0) {
+            if (markov_chain->comp_func(current_markov_node->data, data_ptr) == 0) {
                 // Found the node containing the data
                 return current;
             }
@@ -42,7 +42,7 @@ Node* get_node_from_database(MarkovChain *markov_chain, char *data_ptr) {
     return NULL;
 }
 
-Node* add_to_database(MarkovChain *markov_chain, char *data_ptr) {
+Node* add_to_database(MarkovChain *markov_chain, void *data_ptr) {
     // Check for NULL inputs
     if (markov_chain == NULL || data_ptr == NULL) {
         return NULL;
@@ -65,16 +65,13 @@ Node* add_to_database(MarkovChain *markov_chain, char *data_ptr) {
     }
 
     // Allocate memory for the string data and copy it
-    new_markov_node->data = malloc(strlen(data_ptr) + 1); // +1 for null terminator
+    new_markov_node->data = markov_chain->copy_func(data_ptr);
     if (new_markov_node->data == NULL) {
         // Memory allocation failed
         fprintf(stderr, ALLOCATION_ERROR_MESSAGE);
         free(new_markov_node); // Clean up the previously allocated memory
         return NULL;
     }
-
-    // Copy the string data
-    strcpy(new_markov_node->data, data_ptr);
 
     // Initialize frequency list to NULL (empty) and size to 0
     new_markov_node->frequency_list = NULL;
@@ -185,7 +182,7 @@ void free_database(MarkovChain **ptr_chain) {
             if (markov_node != NULL) {
                 // Free the string data
                 if (markov_node->data != NULL) {
-                    free(markov_node->data);
+                    chain->free_data(markov_node->data);
                 }
 
                 // Free the frequency list

@@ -14,6 +14,39 @@
 /***************************/
 /*   insert typedefs here  */
 /***************************/
+/**
+ * Function pointer type for printing data
+ * @param data pointer to generic data to print
+ */
+typedef void (*print_func)(void *data);
+
+/**
+ * Function pointer type for comparing two data elements
+ * @param first_data pointer to first data element
+ * @param second_data pointer to second data element
+ * @return positive value if first > second, negative if first < second, 0 if equal
+ */
+typedef int (*comp_func)(void *first_data, void *second_data);
+
+/**
+ * Function pointer type for freeing data
+ * @param data pointer to data to free
+ */
+typedef void (*free_data)(void *data);
+
+/**
+ * Function pointer type for copying data
+ * @param data pointer to data to copy
+ * @return pointer to newly allocated copy of data
+ */
+typedef void* (*copy_func)(void *data);
+
+/**
+ * Function pointer type for checking if data should be last in sequence
+ * @param data pointer to data to check
+ * @return true if data should be last in sequence, false otherwise
+ */
+typedef bool (*is_last)(void *data);
 
 
 /***************************/
@@ -24,6 +57,7 @@ typedef struct MarkovNode {
     void *data;
     struct MarkovNodeFrequency *frequency_list;
     // any other fields you need
+    int frequency_list_size;
 } MarkovNode;
 
 typedef struct MarkovNodeFrequency {
@@ -36,16 +70,12 @@ typedef struct MarkovNodeFrequency {
 typedef struct MarkovChain {
     LinkedList *database;
 
-    // It is recommended to declare the function pointers using typedefs
-    print_func;
-
-    comp_func;
-
-    free_data;
-
-    copy_func;
-
-    is_last;
+    // Function pointers for generic operations
+    print_func print_func;
+    comp_func comp_func;
+    free_data free_data;
+    copy_func copy_func;
+    is_last is_last;
 } MarkovChain;
 
 /**
